@@ -6,26 +6,28 @@ import (
 	"go-llm-api-benchmark/internal/types"
 )
 
-// OpenAIProvider 标准 OpenAI 兼容 API 的 Provider 实现。
-// API 端点: POST {base_url}/chat/completions
-// 暂为骨架实现，后续按需完善。
+// OpenAIProvider implements the Provider interface for OpenAI-compatible APIs.
+// API endpoint: POST {base_url}/chat/completions
+// This is a skeleton; full implementation to be added later.
 type OpenAIProvider struct {
-	config *types.Config
+	config *types.OpenAIConfig
 }
 
-func NewOpenAIProvider(cfg *types.Config) *OpenAIProvider {
+func NewOpenAIProvider(cfg *types.OpenAIConfig) *OpenAIProvider {
 	return &OpenAIProvider{config: cfg}
 }
 
-func (p *OpenAIProvider) Name() string { return "openai" }
+func (p *OpenAIProvider) Name() string  { return "openai" }
+func (p *OpenAIProvider) Model() string { return p.config.Model }
 
 func (p *OpenAIProvider) Chat(ctx context.Context, req *types.ChatRequest) (*types.ChatResult, error) {
-	// TODO: 实现标准 OpenAI chat completion 流式调用
-	// 参考: https://platform.openai.com/docs/api-reference/chat/create
+	return nil, nil
+}
+
+func (p *OpenAIProvider) ChatStream(ctx context.Context, req *types.ChatRequest, onChunk ChunkCallback) (*types.ChatResult, error) {
 	return nil, nil
 }
 
 func (p *OpenAIProvider) ListModels(ctx context.Context) ([]string, error) {
-	// TODO: 实现 GET {base_url}/models
 	return []string{p.config.Model}, nil
 }

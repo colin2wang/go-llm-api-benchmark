@@ -1,7 +1,7 @@
-// Package runner 实现并发压测引擎。
+// Package runner implements the concurrent benchmark engine.
 //
-// 对每个并发级别，启动对应数量的 goroutine 同时发送请求，
-// 采集 TTFT、完成时间等指标，最后聚合生成吞吐量数据。
+// For each concurrency level, it spawns concurrent goroutines,
+// collects TTFT and latency metrics, and aggregates throughput data.
 package runner
 
 import (
@@ -16,18 +16,18 @@ import (
 	"go-llm-api-benchmark/internal/types"
 )
 
-// Runner 并发压测引擎
+// Runner drives concurrent benchmark execution.
 type Runner struct {
 	provider provider.Provider
 	logger   *log.Logger
 }
 
-// NewRunner 创建压测引擎
+// NewRunner creates a new Runner.
 func NewRunner(p provider.Provider, l *log.Logger) *Runner {
 	return &Runner{provider: p, logger: l}
 }
 
-// RunTestCase 执行一个测试用例在所有并发级别下的压测
+// RunTestCase runs a test case at all configured concurrency levels.
 func (r *Runner) RunTestCase(ctx context.Context, tc *types.TestCase) *types.TestCaseResult {
 	result := &types.TestCaseResult{
 		TestCase: *tc,
@@ -41,10 +41,10 @@ func (r *Runner) RunTestCase(ctx context.Context, tc *types.TestCase) *types.Tes
 	return result
 }
 
-// runConcurrencyLevel 在指定并发级别下执行压测
+// runConcurrencyLevel runs requests at a given concurrency level.
 //
-// 策略：启动 concurrency 个 worker，每个 worker 发送 1 次请求，
-// 记录所有请求的指标后聚合。
+// Strategy: spawn N goroutines (N = concurrency), each sends 1 request.
+// All metrics are collected and then aggregated.
 func (r *Runner) runConcurrencyLevel(ctx context.Context, tc *types.TestCase, concurrency int) *types.ConcurrencyResult {
 	results := make([]*types.ChatResult, concurrency)
 	var wg sync.WaitGroup
@@ -65,10 +65,16 @@ func (r *Runner) runConcurrencyLevel(ctx context.Context, tc *types.TestCase, co
 
 			chatResult, err := r.provider.Chat(ctx, req)
 			if err != nil {
-				r.logger.Printf("[ERROR] 请求失败 (并发=%d): %v", concurrency, err)
-				results[idx] = &types.ChatResult{Error: fmt.Errorf("请求失败: %v", err)}
+				r.logger.Printf("[ERROR] request failed (concurrency=%d): %v", concurrency, err)
+				results[idx] = &types.ChatResult{
+					RequestIndex: idx,
+					Prompt:       req.Prompt,
+					Error:        fmt.Errorf("request failed: %v", err),
+				}
 				return
 			}
+			chatResult.RequestIndex = idx
+			chatResult.Prompt = req.Prompt
 			results[idx] = chatResult
 		}(i)
 	}
@@ -79,7 +85,7 @@ func (r *Runner) runConcurrencyLevel(ctx context.Context, tc *types.TestCase, co
 	return aggregateResults(concurrency, results, totalDuration)
 }
 
-// aggregateResults 聚合原始结果生成 ConcurrencyResult
+// aggregateResults aggregates raw chat results into a ConcurrencyResult.
 func aggregateResults(concurrency int, results []*types.ChatResult, duration time.Duration) *types.ConcurrencyResult {
 	cr := &types.ConcurrencyResult{
 		Concurrency:   concurrency,
@@ -97,14 +103,20 @@ func aggregateResults(concurrency int, results []*types.ChatResult, duration tim
 	for _, r := range results {
 		if r == nil {
 			cr.FailedRequests++
+			cr.Requests = append(cr.Requests, types.ChatResult{
+				RequestIndex: len(cr.Requests),
+				Error:        fmt.Errorf("request did not complete"),
+			})
 			continue
 		}
 		if r.Error != nil {
 			cr.FailedRequests++
+			cr.Requests = append(cr.Requests, *r)
 			continue
 		}
 
 		cr.TotalRequests++
+		cr.Requests = append(cr.Requests, *r)
 
 		totalOutputTokens += r.CompletionTokens
 		totalInputTokens += r.PromptTokens
@@ -121,20 +133,20 @@ func aggregateResults(concurrency int, results []*types.ChatResult, duration tim
 		}
 	}
 
-	// 处理无成功请求的情况
+	// No successful requests
 	if cr.TotalRequests == 0 {
 		cr.MinTTFT = 0
 		return cr
 	}
 
-	// 计算吞吐量
+	// Throughput calculation
 	durationSec := duration.Seconds()
 	if durationSec > 0 {
 		cr.GenerationThroughput = float64(totalOutputTokens) / durationSec
 		cr.PromptThroughput = float64(totalInputTokens) / durationSec
 	}
 
-	// 计算平均 TTFT
+	// Average TTFT
 	if ttftCount > 0 {
 		cr.AvgTTFT = time.Duration(int64(ttftSum) / int64(ttftCount))
 	} else {

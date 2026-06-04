@@ -1,10 +1,10 @@
-// Package report 提供压测结果的多种输出格式。
+// Package report provides multiple output formats for benchmark results.
 package report
 
 import "go-llm-api-benchmark/internal/types"
 
-// Reporter 报告输出接口（终端实时输出适用）
+// Reporter is the interface for console-oriented result output.
 type Reporter interface {
-	// Report 输出单个测试用例的结果
+	// Report outputs a single test case result.
 	Report(result *types.TestCaseResult)
 }

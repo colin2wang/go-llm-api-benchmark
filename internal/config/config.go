@@ -1,4 +1,4 @@
-// Package config 负责加载和解析 YAML 配置文件。
+// Package config loads and parses YAML configuration files.
 package config
 
 import (
@@ -11,37 +11,50 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// DefaultConfigPath 默认配置文件路径
+// DefaultConfigPath is the default config file path.
 const DefaultConfigPath = "config.yaml"
 
-// DefaultTestCasesDir 默认测试用例目录
+// DefaultTestCasesDir is the default directory for test case YAML files.
 const DefaultTestCasesDir = "test-cases"
 
-// LoadConfig 解析 config.yaml 文件
+// LoadConfig parses config.yaml (provider type + config file path only).
 func LoadConfig(path string) (*types.Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("读取配置文件 %s 失败: %w", path, err)
+		return nil, fmt.Errorf("failed to read config %s: %w", path, err)
 	}
 
 	var cfg types.Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("解析配置文件 %s 失败: %w", path, err)
+		return nil, fmt.Errorf("failed to parse config %s: %w", path, err)
 	}
 
-	// 字段校验
-	if cfg.BaseURL == "" {
-		return nil, fmt.Errorf("配置项 base_url 不能为空")
+	if cfg.Provider == "" {
+		return nil, fmt.Errorf("config field 'provider' must not be empty")
 	}
 
 	return &cfg, nil
 }
 
-// LoadTestCases 扫描目录下所有 .yaml / .yml 文件并解析为 TestSuite 列表
+// LoadProviderConfig loads a provider-specific YAML config into the given struct.
+func LoadProviderConfig(path string, v interface{}) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("failed to read provider config %s: %w", path, err)
+	}
+
+	if err := yaml.Unmarshal(data, v); err != nil {
+		return fmt.Errorf("failed to parse provider config %s: %w", path, err)
+	}
+
+	return nil
+}
+
+// LoadTestCases scans a directory for .yaml/.yml files and parses each as a TestSuite.
 func LoadTestCases(dir string) ([]types.TestFile, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, fmt.Errorf("读取测试用例目录 %s 失败: %w", dir, err)
+		return nil, fmt.Errorf("failed to read test cases directory %s: %w", dir, err)
 	}
 
 	var files []types.TestFile
@@ -57,12 +70,12 @@ func LoadTestCases(dir string) ([]types.TestFile, error) {
 		path := filepath.Join(dir, entry.Name())
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("读取测试用例文件 %s 失败: %w", path, err)
+			return nil, fmt.Errorf("failed to read test case file %s: %w", path, err)
 		}
 
 		var suite types.TestSuite
 		if err := yaml.Unmarshal(data, &suite); err != nil {
-			return nil, fmt.Errorf("解析测试用例文件 %s 失败: %w", path, err)
+			return nil, fmt.Errorf("failed to parse test case file %s: %w", path, err)
 		}
 
 		files = append(files, types.TestFile{

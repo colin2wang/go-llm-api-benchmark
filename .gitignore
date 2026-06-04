@@ -1,5 +1,6 @@
-# Local configuration with sensitive information hidden
+# Local configuration with sensitive information
 config.yaml
+config.*.yaml
 
 # Executable
 bin/

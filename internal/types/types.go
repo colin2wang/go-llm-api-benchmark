@@ -1,9 +1,9 @@
-// Package types 定义整个工具共享的数据结构和常量。
+// Package types defines shared data structures and constants for the benchmark tool.
 package types
 
 import "time"
 
-// ProviderType 支持的 Provider 类型
+// ProviderType enumerates supported LLM provider types.
 type ProviderType string
 
 const (
@@ -11,43 +11,53 @@ const (
 	ProviderHuzhouAI ProviderType = "huzhouai"
 )
 
-// Config 顶层配置，对应 config.yaml
+// Config is the top-level configuration from config.yaml.
+// It only declares the provider type and the path to its dedicated config file.
 type Config struct {
-	Provider ProviderType    `yaml:"provider"`
-	BaseURL  string          `yaml:"base_url"`
-	APIKey   string          `yaml:"api_key"`
-	Model    string          `yaml:"model"`
-	HuzhouAI *HuzhouAIConfig `yaml:"huzhouai,omitempty"`
+	Provider   ProviderType `yaml:"provider"`
+	ConfigFile string       `yaml:"config_file"`
 }
 
-// HuzhouAIConfig 湖州算力平台专属配置
+// HuzhouAIConfig holds Huzhou AI platform-specific configuration.
+// Corresponds to config.huzhouai.yaml.
 type HuzhouAIConfig struct {
+	BaseURL   string `yaml:"base_url"`
+	APIKey    string `yaml:"api_key"`
+	Model     string `yaml:"model,omitempty"` // for display/report only, not sent to API
 	DeptID    string `yaml:"dept_id"`
 	ProjectID string `yaml:"project_id"`
 }
 
-// TestSuite 对应一个 test-case YAML 文件
+// OpenAIConfig holds OpenAI-compatible API configuration.
+// Corresponds to config.openai.yaml.
+type OpenAIConfig struct {
+	BaseURL string `yaml:"base_url"`
+	APIKey  string `yaml:"api_key"`
+	Model   string `yaml:"model"`
+}
+
+// TestSuite maps a single test-case YAML file.
 type TestSuite struct {
 	TestCases []TestCase `yaml:"test_cases"`
 }
 
-// TestCase 单个测试场景
+// TestCase defines a single benchmark scenario.
 type TestCase struct {
 	Name        string `yaml:"name"`
-	Model       string `yaml:"model,omitempty"` // 可选，覆盖 config 中的 model
+	Model       string `yaml:"model,omitempty"` // optional, overrides config model
 	Prompt      string `yaml:"prompt"`
 	MaxTokens   int    `yaml:"max_tokens"`
-	NumWords    int    `yaml:"num_words"` // >0 时按字数随机生成 prompt
+	NumWords    int    `yaml:"num_words"` // >0 generates a random prompt of this many words
 	Concurrency []int  `yaml:"concurrency"`
 }
 
-// TestFile 一个 YAML 文件及其解析出的测试套件
+// TestFile pairs a YAML filename with its parsed TestSuite.
 type TestFile struct {
 	FileName string
 	Suite    TestSuite
 }
 
-// ChatRequest 发送给 Provider 的单次聊天请求参数
+// ChatRequest is sent to a Provider for a single chat completion.
 type ChatRequest struct {
 	Model     string
 	Prompt    string
@@ -55,18 +65,20 @@ type ChatRequest struct {
 	User      string
 }
 
-// ChatResult 单次聊天的完整结果
+// ChatResult holds the complete result of a single chat request.
 type ChatResult struct {
+	RequestIndex     int
+	Prompt           string
 	Response         string
 	PromptTokens     int
 	CompletionTokens int
 	TotalTokens      int
 	TTFT             time.Duration // Time to First Token
-	TotalLatency     time.Duration // 请求总耗时
+	TotalLatency     time.Duration // Total request duration
 	Error            error
 }
 
-// ConcurrencyResult 某一并发级别下的聚合结果
+// ConcurrencyResult aggregates results for one concurrency level.
 type ConcurrencyResult struct {
 	Concurrency          int
 	GenerationThroughput float64 // tokens/s
@@ -77,9 +89,10 @@ type ConcurrencyResult struct {
 	TotalRequests        int
 	FailedRequests       int
 	TotalDuration        time.Duration
+	Requests             []ChatResult // per-request details for detailed reports
 }
 
-// TestCaseResult 单个 TestCase 在各并发级别的完整结果
+// TestCaseResult holds the full result for one test case across all concurrency levels.
 type TestCaseResult struct {
 	TestCase    TestCase
 	Concurrency []ConcurrencyResult

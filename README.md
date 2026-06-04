@@ -121,3 +121,7 @@ The tool generates:
 ## License
 
 MIT License
+
+## Change History
+
+See [CHANGE-HISTORY.md](./CHANGE-HISTORY.md) for a detailed list of changes by version.

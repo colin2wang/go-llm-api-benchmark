@@ -1,10 +1,12 @@
-// Package app 编排整个压测流程：
-// 加载配置 → 创建 Provider → 遍历测试用例 → 执行压测 → 输出报告。
+// Package app orchestrates the full benchmark workflow:
+// load config -> create Provider -> show interactive menu -> manual test / auto benchmark.
 package app
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -21,94 +23,153 @@ import (
 
 const reportDir = "reports"
 
-// Run 是应用入口函数
+// Run is the application entry point.
 func Run() error {
-	// 1. 加载配置文件
+	// 1. Load main config
 	cfgPath := config.DefaultConfigPath
 	if _, err := os.Stat(cfgPath); os.IsNotExist(err) {
-		return fmt.Errorf("配置文件 %s 不存在，请将 config.yaml.example 复制为 config.yaml 并填入真实参数", cfgPath)
+		return fmt.Errorf("config file %s not found; copy config.yaml.example to config.yaml and fill in your settings", cfgPath)
 	}
 
 	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
-		return fmt.Errorf("加载配置失败: %w", err)
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// 2. 创建 Provider
-	p, err := createProvider(cfg)
+	// 2. Create Provider (loads provider-specific config automatically)
+	p, providerModel, err := createProvider(cfg)
 	if err != nil {
-		return fmt.Errorf("创建 Provider 失败: %w", err)
+		return fmt.Errorf("failed to create provider: %w", err)
 	}
-	fmt.Printf("✅ Provider: %s | Model: %s | BaseURL: %s\n", p.Name(), cfg.Model, cfg.BaseURL)
+	fmt.Printf("Provider: %s | Model: %s\n", p.Name(), providerModel)
 
-	// 3. 加载测试用例
+	// 3. Create logger
+	appLog, err := logger.New("log")
+	if err != nil {
+		return fmt.Errorf("failed to create logger: %w", err)
+	}
+
+	// 4. Interactive menu
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		fmt.Println("\n================================================")
+		fmt.Println("  LLM API Benchmark")
+		fmt.Println("================================================")
+		fmt.Println("  1. Manual Test")
+		fmt.Println("  2. Auto Benchmark")
+		fmt.Println("  3. Exit")
+		fmt.Println("================================================")
+		fmt.Print("Select [1-3]: ")
+
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+
+		switch input {
+		case "1":
+			runManualTest(p, providerModel)
+		case "2":
+			runAutoBenchmark(p, providerModel, appLog)
+		case "3":
+			fmt.Println("Goodbye.")
+			return nil
+		default:
+			fmt.Println("Invalid input. Please enter 1, 2, or 3.")
+		}
+	}
+}
+
+// runAutoBenchmark runs the automated benchmark flow using test-case YAML files.
+func runAutoBenchmark(p provider.Provider, model string, appLog *log.Logger) {
 	testFiles, err := config.LoadTestCases(config.DefaultTestCasesDir)
 	if err != nil {
-		return fmt.Errorf("加载测试用例失败: %w", err)
+		fmt.Fprintf(os.Stderr, "ERROR: failed to load test cases: %v\n", err)
+		return
 	}
 	if len(testFiles) == 0 {
-		return fmt.Errorf("test-cases 目录下没有找到 .yaml 文件")
+		fmt.Fprintln(os.Stderr, "ERROR: no .yaml files found in test-cases directory")
+		return
 	}
-	fmt.Printf("📂 测试文件数: %d\n\n", len(testFiles))
+	fmt.Printf("Test files: %d\n\n", len(testFiles))
 
-	// 4. 创建日志记录器
-	log, err := logger.New("log")
-	if err != nil {
-		return fmt.Errorf("创建日志记录器失败: %w", err)
-	}
-
-	// 5. 创建 Runner 和 Reporter
-	r := runner.NewRunner(p, log)
+	r := runner.NewRunner(p, appLog)
 	consoleRep := report.NewConsoleReporter()
 	markdownRep := report.NewMarkdownReporter(reportDir)
+	detailedRep := report.NewDetailedMarkdownReporter(filepath.Join(reportDir, "detailed"))
 
-	// 6. 逐个测试文件执行
 	for _, tf := range testFiles {
-		fmt.Printf("═══════════════════════════════════════════════\n")
-		fmt.Printf("  文件: %s\n", tf.FileName)
-		fmt.Printf("═══════════════════════════════════════════════\n")
+		appLog.Printf("---------- Test file: %s ----------", tf.FileName)
+		fmt.Printf("================================================\n")
+		fmt.Printf("  File: %s\n", tf.FileName)
+		fmt.Printf("================================================\n")
 
 		var results []*types.TestCaseResult
 
 		for _, tc := range tf.Suite.TestCases {
-			// 合并配置：从 config 继承 model
 			if tc.Model == "" {
-				tc.Model = cfg.Model
+				tc.Model = model
 			}
-			// 生成随机 prompt
 			tc.Prompt = buildPrompt(&tc)
 
-			fmt.Printf("\n  ▶ 测试: %s\n", tc.Name)
+			appLog.Printf("Test [%s] concurrency=%v max_tokens=%d prompt_len=%d",
+				tc.Name, tc.Concurrency, tc.MaxTokens, len(tc.Prompt))
+			fmt.Printf("\n  > Test: %s\n", tc.Name)
 			fmt.Printf("    Prompt: %s\n", truncateString(tc.Prompt, 80))
 
 			result := r.RunTestCase(context.Background(), &tc)
 			results = append(results, result)
 
-			// 实时输出到终端
 			consoleRep.Report(result)
 		}
 
-		// 每个测试文件生成一份 Markdown 报告
 		baseName := strings.TrimSuffix(tf.FileName, filepath.Ext(tf.FileName))
 		markdownRep.ReportAll(results, baseName+".md")
+
+		for _, result := range results {
+			detailName := fmt.Sprintf("%s_%s_detailed.md",
+				baseName, sanitizeName(result.TestCase.Name))
+			detailedRep.Report(result, detailName)
+		}
 	}
 
-	return nil
+	appLog.Printf("========== Auto Benchmark Completed ==========")
+	fmt.Println("\nAuto benchmark completed.")
 }
 
-// createProvider 根据配置创建对应的 Provider 实例
-func createProvider(cfg *types.Config) (provider.Provider, error) {
+// createProvider loads the provider-specific config and instantiates the corresponding Provider.
+func createProvider(cfg *types.Config) (provider.Provider, string, error) {
+	configFile := cfg.ConfigFile
+	if configFile == "" {
+		configFile = fmt.Sprintf("config.%s.yaml", cfg.Provider)
+	}
+
 	switch cfg.Provider {
 	case types.ProviderHuzhouAI:
-		return provider.NewHuzhouAIProvider(cfg), nil
+		var hzCfg types.HuzhouAIConfig
+		if err := config.LoadProviderConfig(configFile, &hzCfg); err != nil {
+			return nil, "", err
+		}
+		if hzCfg.BaseURL == "" {
+			return nil, "", fmt.Errorf("base_url must not be empty (check %s)", configFile)
+		}
+		return provider.NewHuzhouAIProvider(&hzCfg), hzCfg.Model, nil
+
 	case types.ProviderOpenAI:
-		return provider.NewOpenAIProvider(cfg), nil
+		var oaiCfg types.OpenAIConfig
+		if err := config.LoadProviderConfig(configFile, &oaiCfg); err != nil {
+			return nil, "", err
+		}
+		if oaiCfg.BaseURL == "" {
+			return nil, "", fmt.Errorf("base_url must not be empty (check %s)", configFile)
+		}
+		return provider.NewOpenAIProvider(&oaiCfg), oaiCfg.Model, nil
+
 	default:
-		return nil, fmt.Errorf("不支持的 Provider 类型: %s (可选: openai, huzhouai)", cfg.Provider)
+		return nil, "", fmt.Errorf("unsupported provider type: %s (options: openai, huzhouai)", cfg.Provider)
 	}
 }
 
-// buildPrompt 根据 TestCase 配置生成实际的 prompt 文本
+// buildPrompt generates the final prompt text based on test case config.
 func buildPrompt(tc *types.TestCase) string {
 	if tc.Prompt != "" {
 		return tc.Prompt
@@ -119,13 +180,12 @@ func buildPrompt(tc *types.TestCase) string {
 	return "Tell me a story."
 }
 
-// generateRandomWords 生成指定单词数的随机文本
+// generateRandomWords generates a random prompt with the given word count.
 func generateRandomWords(n int) string {
 	if n <= 0 {
 		return ""
 	}
 
-	// 常用英文单词池，用于生成多样化的测试 prompt
 	wordPool := []string{
 		"the", "a", "an", "and", "or", "but", "in", "on", "at", "to",
 		"for", "of", "with", "by", "from", "as", "is", "was", "are", "were",
@@ -163,6 +223,23 @@ func truncateString(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// sanitizeName replaces special characters with underscores for safe filenames.
+func sanitizeName(name string) string {
+	r := strings.NewReplacer(
+		" ", "_",
+		"/", "_",
+		"\\", "_",
+		":", "_",
+		"*", "_",
+		"?", "_",
+		"\"", "_",
+		"<", "_",
+		">", "_",
+		"|", "_",
+	)
+	return r.Replace(name)
 }
 
 func init() {

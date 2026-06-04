@@ -1,19 +1,4 @@
-# config.yaml.example — LLM API Benchmark 配置文件模板
-# 复制为 config.yaml 并填入真实值
-
-# Provider 类型: openai | huzhouai
+# config.yaml.example -- LLM API Benchmark main config template
+# Copy to config.yaml, set the provider type and the path to its dedicated config file.
 provider: huzhouai
-
-# API 基础地址（末尾不带 /）
-base_url: https://llm.huzhou.gov.cn/mmttapi/v1
-
-# API 密钥
-api_key: your-api-key-here
-
-# 默认模型（可在 test-case 中覆盖）
-model: Qwen2.5-7B-Instruct-AWQ
-
-# 湖州算力平台专属配置
-huzhouai:
-  dept_id: d-825f4a25ca0346fea708
-  project_id: p-7a478b2d9c2f416ab42f
+config_file: config.huzhouai.yaml

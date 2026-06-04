@@ -1,20 +1,20 @@
-# full-benchmark.yaml — 完整压测集
-# 覆盖多档文本长度和并发度，生成详细的性能报告
+# full-benchmark.yaml -- Full benchmark set
+# Covers short, medium and long prompts across the full concurrency gradient.
 test_cases:
-  - name: "短文本-全并发梯度"
+  - name: "Short text - full gradient"
     prompt: "What are the specs of the iPhone 13 Pro Max?"
     max_tokens: 256
     num_words: 0
-    concurrency: [1, 2, 4, 8, 16, 32]
+    concurrency: [1, 2, 4, 8]
 
-  - name: "中文本-全并发梯度"
-    prompt: ""
+  - name: "Quantum computing overview"
+    prompt: "Please provide a comprehensive overview of quantum computing, including its fundamental principles, current state of development, major challenges, and potential applications across different industries such as healthcare, finance, and cryptography."
     max_tokens: 512
-    num_words: 200
-    concurrency: [1, 2, 4, 8, 16]
+    num_words: 0
+    concurrency: [1, 2, 4, 8]
 
-  - name: "长文本-全并发梯度"
-    prompt: ""
+  - name: "History of AI"
+    prompt: "Write a detailed essay on the history and evolution of artificial intelligence, covering its origins in the 1950s, the AI winters and springs, the rise of machine learning, deep learning breakthroughs, the emergence of large language models, and the future implications for society and humanity."
     max_tokens: 1024
-    num_words: 500
+    num_words: 0
     concurrency: [1, 2, 4, 8]

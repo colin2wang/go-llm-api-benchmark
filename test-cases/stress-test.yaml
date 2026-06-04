@@ -1,14 +1,14 @@
-# stress-test.yaml — 高压测试集
-# 大并发 + 长文本，用于评估 API 在极限负载下的表现
+# stress-test.yaml -- Stress test set
+# Long prompts at high concurrency to evaluate API performance under load.
 test_cases:
-  - name: "超长文本-高压并发"
-    prompt: ""
+  - name: "Climate change report - long"
+    prompt: "Write a comprehensive analysis report on global climate change, including the scientific evidence for global warming, the impact of human activities on greenhouse gas emissions, the effects on ecosystems and biodiversity, the economic consequences for different regions, the international policy responses such as the Paris Agreement, the role of renewable energy technologies, carbon capture solutions, and the projected scenarios for sea level rise, extreme weather events, and temperature increases over the next century. Also discuss the social and political challenges in implementing climate action, the concept of climate justice, and the potential pathways to achieve net-zero emissions by 2050."
     max_tokens: 2048
-    num_words: 1000
-    concurrency: [1, 4, 16, 64]
+    num_words: 0
+    concurrency: [1, 2, 4, 8]
 
-  - name: "中文本-极限并发"
-    prompt: ""
+  - name: "Deep learning techniques"
+    prompt: "Provide a detailed explanation of deep learning, including convolutional neural networks for image recognition, recurrent neural networks and transformers for natural language processing, generative adversarial networks for image synthesis, and reinforcement learning for game playing and robotics. Discuss the mathematical foundations, training techniques, and real-world applications."
     max_tokens: 512
-    num_words: 200
-    concurrency: [16, 32, 64, 128]
+    num_words: 0
+    concurrency: [1, 2, 4, 8]

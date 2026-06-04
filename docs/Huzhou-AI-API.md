@@ -1,4 +1,4 @@
-# API Example
+# Huzhou AI API Example
 
 ```shell
 	curl -X POST 'https://llm.huzhou.gov.cn/mmttapi/v1/chat-messages' \
