@@ -1,0 +1,20 @@
+# full-benchmark.yaml — 完整压测集
+# 覆盖多档文本长度和并发度，生成详细的性能报告
+test_cases:
+  - name: "短文本-全并发梯度"
+    prompt: "What are the specs of the iPhone 13 Pro Max?"
+    max_tokens: 256
+    num_words: 0
+    concurrency: [1, 2, 4, 8, 16, 32]
+
+  - name: "中文本-全并发梯度"
+    prompt: ""
+    max_tokens: 512
+    num_words: 200
+    concurrency: [1, 2, 4, 8, 16]
+
+  - name: "长文本-全并发梯度"
+    prompt: ""
+    max_tokens: 1024
+    num_words: 500
+    concurrency: [1, 2, 4, 8]

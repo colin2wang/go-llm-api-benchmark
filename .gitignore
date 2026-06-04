@@ -1,0 +1,17 @@
+# Local configuration with sensitive information hidden
+config.yaml
+
+# Executable
+bin/
+
+# Markdown Reports
+reports/
+
+# Logs output
+log/
+
+# AI Code Tools
+.atomcode/
+
+# Goland
+.idea/

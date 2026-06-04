@@ -1,0 +1,14 @@
+# stress-test.yaml — 高压测试集
+# 大并发 + 长文本，用于评估 API 在极限负载下的表现
+test_cases:
+  - name: "超长文本-高压并发"
+    prompt: ""
+    max_tokens: 2048
+    num_words: 1000
+    concurrency: [1, 4, 16, 64]
+
+  - name: "中文本-极限并发"
+    prompt: ""
+    max_tokens: 512
+    num_words: 200
+    concurrency: [16, 32, 64, 128]

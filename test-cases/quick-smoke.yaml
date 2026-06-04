@@ -1,0 +1,14 @@
+# quick-smoke.yaml — 快速验证集
+# 短文本 + 低并发，用于快速确认 API 连通性和工具正常工作
+test_cases:
+  - name: "短文本-低并发"
+    prompt: "What are the specs of the iPhone 13 Pro Max?"
+    max_tokens: 256
+    num_words: 0
+    concurrency: [1, 2, 4]
+
+  - name: "短文本-中并发"
+    prompt: "Explain the theory of relativity in simple terms."
+    max_tokens: 512
+    num_words: 0
+    concurrency: [4, 8]
