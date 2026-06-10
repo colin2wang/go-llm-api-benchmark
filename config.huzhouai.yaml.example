@@ -6,3 +6,12 @@ base_url: https://llm.huzhou.gov.cn/mmttapi/v1
 api_key: your-api-key-here
 dept_id: d-825f4a25ca0346fea708
 project_id: p-7a478b2d9c2f416ab42f
+
+# Dify API 'user' identifier. Sent with every request.
+user: abc-123
+
+# Dify API 'inputs' dict. JSON object that gets sent as-is. Default: {}
+inputs: {}
+
+# Dify API response_mode: "streaming" (SSE) or "blocking". Default: streaming
+response_mode: streaming

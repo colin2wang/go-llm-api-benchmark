@@ -22,12 +22,15 @@ const manualReportDir = "reports" + string(os.PathSeparator) + "manual"
 func runManualTest(p provider.Provider, cfgModel string) {
 	reader := bufio.NewReader(os.Stdin)
 
+	// Display conversation_id if the provider supports it
+	printSessionInfo(p)
+
 	for {
 		fmt.Println("\n================================================")
 		fmt.Println("  Manual Test Mode")
 		fmt.Println("================================================")
 
-		fmt.Print("\nEnter your question (type /back to return to menu): ")
+		fmt.Print("\nEnter your question (type /back to return to menu, /session new to reset conversation): ")
 		question, _ := reader.ReadString('\n')
 		question = strings.TrimSpace(question)
 		if question == "" {
@@ -35,6 +38,12 @@ func runManualTest(p provider.Provider, cfgModel string) {
 		}
 		if question == "/back" {
 			return
+		}
+
+		// Handle /session new command
+		if handleSessionCommand(p, question) {
+			printSessionInfo(p)
+			continue
 		}
 
 		concurrency := 1
@@ -56,7 +65,34 @@ func runManualTest(p provider.Provider, cfgModel string) {
 
 		fmt.Println()
 		runSingleManualTest(p, cfgModel, question, concurrency)
+		printSessionInfo(p)
 	}
+}
+
+// printSessionInfo displays the current conversation_id if the provider supports it.
+func printSessionInfo(p provider.Provider) {
+	if hz, ok := p.(*provider.HuzhouAIProvider); ok {
+		if cid := hz.ConversationID(); cid != "" {
+			fmt.Printf("  [session] conversation_id: %s\n", cid)
+		} else {
+			fmt.Println("  [session] no active session (send a question to start one)")
+		}
+	}
+}
+
+// handleSessionCommand checks if the input is a session command and acts on it.
+// Returns true if the input was a session command (caller should skip normal processing).
+func handleSessionCommand(p provider.Provider, input string) bool {
+	if strings.HasPrefix(input, "/session new") {
+		if hz, ok := p.(*provider.HuzhouAIProvider); ok {
+			hz.ResetSession()
+			fmt.Println("  [session] conversation reset (next request will start a new conversation)")
+		} else {
+			fmt.Println("  [session] session management not supported by this provider")
+		}
+		return true
+	}
+	return false
 }
 
 // runSingleManualTest executes a single manual test.

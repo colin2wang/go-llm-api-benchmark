@@ -1,5 +1,16 @@
 # Change History
 
+## 2026-06-10
+
+### HuzhouAI: session management, configurable response mode, blocking parser
+- `conversation_id` is now sent as empty string on first request and extracted from the API response for reuse
+- Added `/session new` command in interactive manual mode to reset conversation (next request sends `""`)
+- Added `user` and `inputs` fields to `config.huzhouai.yaml` (pulled from YAML, not hardcoded)
+- Added `response_mode` config option (`streaming` or `blocking`, default `streaming`)
+- Blocking mode parser: reads single JSON response and extracts answer/conversation_id/usage
+- Console output now shows a copy-paste ready `curl` command with full auth key for debugging
+- Request headers and body logged to both console and log file on every call
+
 ## 2026-06-04
 
 ### All-Chinese text migrated to English

@@ -21,11 +21,14 @@ type Config struct {
 // HuzhouAIConfig holds Huzhou AI platform-specific configuration.
 // Corresponds to config.huzhouai.yaml.
 type HuzhouAIConfig struct {
-	BaseURL   string `yaml:"base_url"`
-	APIKey    string `yaml:"api_key"`
-	Model     string `yaml:"model,omitempty"` // for display/report only, not sent to API
-	DeptID    string `yaml:"dept_id"`
-	ProjectID string `yaml:"project_id"`
+	BaseURL      string                 `yaml:"base_url"`
+	APIKey       string                 `yaml:"api_key"`
+	Model        string                 `yaml:"model,omitempty"` // for display/report only, not sent to API
+	DeptID       string                 `yaml:"dept_id"`
+	ProjectID    string                 `yaml:"project_id"`
+	User         string                 `yaml:"user"`
+	Inputs       map[string]interface{} `yaml:"inputs"`        // default: {} when empty
+	ResponseMode string                 `yaml:"response_mode"` // "streaming" or "blocking", default "streaming"
 }
 
 // OpenAIConfig holds OpenAI-compatible API configuration.
