@@ -169,9 +169,38 @@ func (p *HuzhouAIProvider) ChatStream(ctx context.Context, req *types.ChatReques
 	}
 
 	if responseMode == "streaming" {
-		return p.parseSSEStream(resp.Body, startTime, onChunk)
+		result, parseErr := p.parseSSEStream(resp.Body, startTime, onChunk)
+		if result != nil && parseErr == nil {
+			p.logTiming("streaming", result)
+		}
+		return result, parseErr
 	}
-	return p.parseBlockingResponse(resp.Body, startTime, onChunk)
+	result, parseErr := p.parseBlockingResponse(resp.Body, startTime, onChunk)
+	if result != nil && parseErr == nil {
+		p.logTiming("blocking", result)
+	}
+	return result, parseErr
+}
+
+// logTiming prints and logs timing metrics appropriate to the response mode.
+func (p *HuzhouAIProvider) logTiming(mode string, r *types.ChatResult) {
+	genTime := r.TotalLatency - r.TTFT
+	var genSpeed float64
+	if genTime > 0 && r.CompletionTokens > 0 {
+		genSpeed = float64(r.CompletionTokens) / genTime.Seconds()
+	}
+	var overallSpeed float64
+	if r.TotalLatency > 0 && r.CompletionTokens > 0 {
+		overallSpeed = float64(r.CompletionTokens) / r.TotalLatency.Seconds()
+	}
+
+	if mode == "streaming" {
+		log.Printf("[huzhouai] timing(streaming): ttft=%.3fs latency=%.3fs gen_time=%.3fs gen_speed=%.1f tok/s overall=%.1f tok/s tokens=%d",
+			r.TTFT.Seconds(), r.TotalLatency.Seconds(), genTime.Seconds(), genSpeed, overallSpeed, r.CompletionTokens)
+	} else {
+		log.Printf("[huzhouai] timing(blocking): latency=%.3fs speed=%.1f tok/s tokens=%d",
+			r.TotalLatency.Seconds(), overallSpeed, r.CompletionTokens)
+	}
 }
 
 // parseBlockingResponse parses a single Dify blocking (non-SSE) JSON response.
@@ -204,9 +233,8 @@ func (p *HuzhouAIProvider) parseBlockingResponse(body io.Reader, startTime time.
 		p.setConversationID(resp.ConversationID)
 	}
 
-	// Full answer (no streaming chunks)
-	ttft := time.Since(startTime)
-	result.TTFT = ttft
+	// Full answer (no streaming chunks — TTFT is not applicable for blocking mode)
+	result.TTFT = 0
 
 	if resp.Answer != "" && onChunk != nil {
 		onChunk(resp.Answer)

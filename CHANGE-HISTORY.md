@@ -10,6 +10,9 @@
 - Blocking mode parser: reads single JSON response and extracts answer/conversation_id/usage
 - Console output now shows a copy-paste ready `curl` command with full auth key for debugging
 - Request headers and body logged to both console and log file on every call
+- Timing statistics per conversation: logs and console display different metrics for streaming vs blocking
+  - Streaming: TTFT, total latency, generation time, generation speed (tok/s)
+  - Blocking: total latency, overall speed (tok/s); TTFT not applicable
 
 ## 2026-06-04
 

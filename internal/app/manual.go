@@ -22,13 +22,19 @@ const manualReportDir = "reports" + string(os.PathSeparator) + "manual"
 func runManualTest(p provider.Provider, cfgModel string) {
 	reader := bufio.NewReader(os.Stdin)
 
-	// Display conversation_id if the provider supports it
-	printSessionInfo(p)
-
 	for {
 		fmt.Println("\n================================================")
 		fmt.Println("  Manual Test Mode")
 		fmt.Println("================================================")
+
+		// Show current conversation_id before the prompt
+		if hz, ok := p.(*provider.HuzhouAIProvider); ok {
+			if cid := hz.ConversationID(); cid != "" {
+				fmt.Printf("  [session] conversation_id: %s\n", cid)
+			} else {
+				fmt.Println("  [session] no active session (new conversation will be created)")
+			}
+		}
 
 		fmt.Print("\nEnter your question (type /back to return to menu, /session new to reset conversation): ")
 		question, _ := reader.ReadString('\n')
@@ -41,8 +47,13 @@ func runManualTest(p provider.Provider, cfgModel string) {
 		}
 
 		// Handle /session new command
-		if handleSessionCommand(p, question) {
-			printSessionInfo(p)
+		if strings.HasPrefix(question, "/session new") {
+			if hz, ok := p.(*provider.HuzhouAIProvider); ok {
+				hz.ResetSession()
+				fmt.Println("  [session] conversation reset (next request will start a new conversation)")
+			} else {
+				fmt.Println("  [session] session management not supported by this provider")
+			}
 			continue
 		}
 
@@ -65,34 +76,7 @@ func runManualTest(p provider.Provider, cfgModel string) {
 
 		fmt.Println()
 		runSingleManualTest(p, cfgModel, question, concurrency)
-		printSessionInfo(p)
 	}
-}
-
-// printSessionInfo displays the current conversation_id if the provider supports it.
-func printSessionInfo(p provider.Provider) {
-	if hz, ok := p.(*provider.HuzhouAIProvider); ok {
-		if cid := hz.ConversationID(); cid != "" {
-			fmt.Printf("  [session] conversation_id: %s\n", cid)
-		} else {
-			fmt.Println("  [session] no active session (send a question to start one)")
-		}
-	}
-}
-
-// handleSessionCommand checks if the input is a session command and acts on it.
-// Returns true if the input was a session command (caller should skip normal processing).
-func handleSessionCommand(p provider.Provider, input string) bool {
-	if strings.HasPrefix(input, "/session new") {
-		if hz, ok := p.(*provider.HuzhouAIProvider); ok {
-			hz.ResetSession()
-			fmt.Println("  [session] conversation reset (next request will start a new conversation)")
-		} else {
-			fmt.Println("  [session] session management not supported by this provider")
-		}
-		return true
-	}
-	return false
 }
 
 // runSingleManualTest executes a single manual test.
@@ -165,8 +149,26 @@ func runSingleManualTest(p provider.Provider, cfgModel, question string, concurr
 			result.Response = buffers[idx].String()
 			results[idx] = result
 
-			fmt.Printf("\n[#%d] OK %d tokens (TTFT: %.2fs, latency: %.2fs)\n",
-				idx+1, result.CompletionTokens, result.TTFT.Seconds(), result.TotalLatency.Seconds())
+			// Show timing metrics appropriate to the response mode
+			genTime := result.TotalLatency - result.TTFT
+			if result.TTFT > 0 {
+				// Streaming mode: has TTFT, show generation break-down
+				var genSpeed float64
+				if genTime > 0 && result.CompletionTokens > 0 {
+					genSpeed = float64(result.CompletionTokens) / genTime.Seconds()
+				}
+				fmt.Printf("\n[#%d] OK %d tokens | ttft=%.3fs latency=%.3fs gen=%.3fs gen_speed=%.1f tok/s\n",
+					idx+1, result.CompletionTokens,
+					result.TTFT.Seconds(), result.TotalLatency.Seconds(), genTime.Seconds(), genSpeed)
+			} else {
+				// Blocking mode: no TTFT, show overall speed only
+				var speed float64
+				if result.TotalLatency > 0 && result.CompletionTokens > 0 {
+					speed = float64(result.CompletionTokens) / result.TotalLatency.Seconds()
+				}
+				fmt.Printf("\n[#%d] OK %d tokens | latency=%.3fs speed=%.1f tok/s\n",
+					idx+1, result.CompletionTokens, result.TotalLatency.Seconds(), speed)
+			}
 			mu.Unlock()
 		}(i)
 	}
